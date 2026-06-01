@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>Wang Walaya Wedding Planner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#fdf8f3;font-family:'Sarabun','Noto Sans Thai',sans-serif;min-height:100vh;}
+input,button{font-family:inherit;}
+input[type=date]::-webkit-calendar-picker-indicator{opacity:.5;}
+.spinner{width:36px;height:36px;border:3px solid #f0e8df;border-top-color:#C9A96E;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDEJn-dMmge9mpDDh4mzHnkJcWbVdwTOAc",
+  authDomain: "wang-walaya-planner.firebaseapp.com",
+  databaseURL: "https://wang-walaya-planner-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "wang-walaya-planner",
+  storageBucket: "wang-walaya-planner.firebasestorage.app",
+  messagingSenderId: "110005433177",
+  appId: "1:110005433177:web:438c066dfeed819fa85248"
+};
+// ─────────────────────────────────────────────────────────────────────────
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+</script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+const DEFAULT_CATEGORIES=[
+  {id:"venue",icon:"🏛️",title:"สถานที่จัดงาน",color:"#C9A96E",items:[
+    {id:"v1",text:"กำหนดงบประมาณรวม",done:false,dueDate:"",vendor:""},
+    {id:"v2",text:"เลือกสถานที่จัดงาน",done:false,dueDate:"",vendor:""},
+    {id:"v3",text:"จองสถานที่และวางเงินมัดจำ",done:false,dueDate:"",vendor:""},
+    {id:"v4",text:"ตรวจสอบความจุของสถานที่",done:false,dueDate:"",vendor:""},
+    {id:"v5",text:"ยืนยันที่จอดรถ",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"guest",icon:"👥",title:"รายชื่อแขก",color:"#B5838D",items:[
+    {id:"g1",text:"จัดทำรายชื่อแขกทั้งหมด",done:false,dueDate:"",vendor:""},
+    {id:"g2",text:"ส่งการ์ดเชิญ",done:false,dueDate:"",vendor:""},
+    {id:"g3",text:"ติดตามการตอบรับ RSVP",done:false,dueDate:"",vendor:""},
+    {id:"g4",text:"จัดผังที่นั่ง",done:false,dueDate:"",vendor:""},
+    {id:"g5",text:"แจ้งจำนวนแขกให้สถานที่",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"organizer",icon:"🎪",title:"ออร์แกไนซ์",color:"#7B9E87",items:[
+    {id:"or1",text:"จองทีมออร์แกไนซ์ (มัดจำครั้งที่ 1) ออกใบจอง",done:false,dueDate:"",vendor:""},
+    {id:"or2",text:"วัดหน้างานดูสถานที่จัดงาน",done:false,dueDate:"",vendor:""},
+    {id:"or3",text:"ประชุมวางแผนงานครั้งแรก",done:false,dueDate:"",vendor:""},
+    {id:"or4",text:"ออร์แกไนซ์ส่งใบเสนอราคา",done:false,dueDate:"",vendor:""},
+    {id:"or5",text:"กำหนด timeline งานทั้งหมด",done:false,dueDate:"",vendor:""},
+    {id:"or6",text:"ส่งแบบงาน 2D",done:false,dueDate:"",vendor:""},
+    {id:"or7",text:"มัดจำครั้งที่ 2",done:false,dueDate:"",vendor:""},
+    {id:"or8",text:"สรุปงาน Final",done:false,dueDate:"",vendor:""},
+    {id:"or9",text:"ชำระยอดที่เหลือ (สุดท้าย)",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"planner",icon:"📋",title:"Wedding Planner",color:"#9B7EBD",items:[
+    {id:"pl1",text:"จอง Wedding Planner",done:false,dueDate:"",vendor:""},
+    {id:"pl2",text:"ประชุมวางแผนภาพรวมงาน",done:false,dueDate:"",vendor:""},
+    {id:"pl3",text:"กำหนดธีมและสไตล์งาน",done:false,dueDate:"",vendor:""},
+    {id:"pl4",text:"ประสานงาน vendor ทุกฝ่ายแทนลูกค้า",done:false,dueDate:"",vendor:""},
+    {id:"pl5",text:"ซักซ้อมงานและ timeline",done:false,dueDate:"",vendor:""},
+    {id:"pl6",text:"ควบคุมดูแลงานวันจริงทั้งหมด",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"photo",icon:"📸",title:"ภาพถ่ายและวิดีโอ",color:"#9DB4C0",items:[
+    {id:"p1",text:"จองช่างภาพ",done:false,dueDate:"",vendor:""},
+    {id:"p2",text:"จองช่างวิดีโอ",done:false,dueDate:"",vendor:""},
+    {id:"p3",text:"ถ่ายภาพ Pre-wedding",done:false,dueDate:"",vendor:""},
+    {id:"p4",text:"กำหนด shot list ที่ต้องการ",done:false,dueDate:"",vendor:""},
+    {id:"p5",text:"ยืนยันตารางถ่ายภาพวันงาน",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"makeup",icon:"💄",title:"ช่างแต่งหน้า",color:"#E8A598",items:[
+    {id:"mk1",text:"เลือกและจองช่างแต่งหน้าเจ้าสาว",done:false,dueDate:"",vendor:""},
+    {id:"mk2",text:"ทดลองแต่งหน้า (Trial makeup)",done:false,dueDate:"",vendor:""},
+    {id:"mk3",text:"ยืนยันสไตล์เมคอัพและทรงผม",done:false,dueDate:"",vendor:""},
+    {id:"mk4",text:"จองช่างแต่งหน้าสำหรับเพื่อนเจ้าสาว",done:false,dueDate:"",vendor:""},
+    {id:"mk5",text:"ยืนยันเวลาและสถานที่แต่งหน้าวันงาน",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"dress",icon:"👗",title:"ชุดแต่งงาน",color:"#DDB892",items:[
+    {id:"d1",text:"เลือกและจองชุดเจ้าสาว",done:false,dueDate:"",vendor:""},
+    {id:"d2",text:"ลองชุดครั้งแรก",done:false,dueDate:"",vendor:""},
+    {id:"d3",text:"ลองชุดครั้งสุดท้าย",done:false,dueDate:"",vendor:""},
+    {id:"d4",text:"เลือกชุดสูทเจ้าบ่าว",done:false,dueDate:"",vendor:""},
+    {id:"d5",text:"เลือกชุดเพื่อนเจ้าสาว/เจ้าบ่าว",done:false,dueDate:"",vendor:""},
+    {id:"d6",text:"รับชุดและตรวจสอบความเรียบร้อย",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"food",icon:"🍽️",title:"อาหาร / เค้ก / เครื่องดื่ม",color:"#A8C5A0",items:[
+    {id:"f1",text:"เลือกเมนูอาหาร",done:false,dueDate:"",vendor:""},
+    {id:"f2",text:"ชิมอาหารกับผู้จัดเลี้ยง",done:false,dueDate:"",vendor:""},
+    {id:"f3",text:"ยืนยันจำนวนอาหาร",done:false,dueDate:"",vendor:""},
+    {id:"f4",text:"สั่งเค้กแต่งงาน",done:false,dueDate:"",vendor:""},
+    {id:"f5",text:"เลือกประเภทเครื่องดื่ม (แอลกอฮอล์/ไม่มีแอลกอฮอล์)",done:false,dueDate:"",vendor:""},
+    {id:"f6",text:"คำนวณปริมาณเครื่องดื่มต่อจำนวนแขก",done:false,dueDate:"",vendor:""},
+    {id:"f7",text:"เลือก signature drink สำหรับงาน",done:false,dueDate:"",vendor:""},
+    {id:"f8",text:"จัดเตรียมน้ำดื่มและน้ำแข็ง",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"mc",icon:"🎤",title:"พิธีกร / นายพิธี",color:"#F0A500",items:[
+    {id:"mc1",text:"เลือกและจองพิธีกร/นายพิธี",done:false,dueDate:"",vendor:""},
+    {id:"mc2",text:"ส่งสคริปต์และข้อมูลคู่บ่าวสาวให้พิธีกร",done:false,dueDate:"",vendor:""},
+    {id:"mc3",text:"ประชุมพิธีกรเรื่องลำดับงาน",done:false,dueDate:"",vendor:""},
+    {id:"mc4",text:"ยืนยันเวลาและสถานที่กับพิธีกร",done:false,dueDate:"",vendor:""},
+    {id:"mc5",text:"ซักซ้อมลำดับงานกับพิธีกร",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"runq",icon:"🏃",title:"ทีมรันคิว",color:"#89C4C7",items:[
+    {id:"rq1",text:"จองทีมรันคิว",done:false,dueDate:"",vendor:""},
+    {id:"rq2",text:"ส่งสคริปต์และข้อมูลคู่บ่าวสาวให้ทีมรันคิว",done:false,dueDate:"",vendor:""},
+    {id:"rq3",text:"ยืนยัน timeline กับทีมรันคิว",done:false,dueDate:"",vendor:""},
+    {id:"rq4",text:"ประชุมกับทีมรันคิวและพิธีกร",done:false,dueDate:"",vendor:""},
+    {id:"rq5",text:"ซักซ้อมการรันคิว",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"sound",icon:"💡",title:"ระบบ Light & Sound",color:"#ADA7C9",items:[
+    {id:"ls1",text:"จองทีม Light & Sound",done:false,dueDate:"",vendor:""},
+    {id:"ls2",text:"กำหนดธีมแสงและบรรยากาศ",done:false,dueDate:"",vendor:""},
+    {id:"ls3",text:"ตรวจสอบระบบเสียงและไมค์",done:false,dueDate:"",vendor:""},
+    {id:"ls4",text:"เตรียม playlist และ cue ไฟ",done:false,dueDate:"",vendor:""},
+    {id:"ls5",text:"ซักซ้อมระบบ Light & Sound กับทีม",done:false,dueDate:"",vendor:""},
+    {id:"ls6",text:"ตรวจสอบอุปกรณ์วันก่อนงาน",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"music",icon:"🎵",title:"ดนตรีและความบันเทิง",color:"#B5838D",items:[
+    {id:"m1",text:"จองวงดนตรีหรือ DJ",done:false,dueDate:"",vendor:""},
+    {id:"m2",text:"เลือกเพลงสำหรับพิธีแต่งงาน",done:false,dueDate:"",vendor:""},
+    {id:"m3",text:"เลือกเพลงเต้นรำคู่แรก",done:false,dueDate:"",vendor:""},
+    {id:"m4",text:"จัด playlist เพลงงานเลี้ยง",done:false,dueDate:"",vendor:""},
+    {id:"m5",text:"ซักซ้อมกับวงดนตรี/DJ ก่อนวันงาน",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"gifts",icon:"🎁",title:"ของชำร่วย / ของรับไหว้ / ของที่ระลึก",color:"#C97EC0",items:[
+    {id:"gi1",text:"เลือกประเภทของชำร่วย",done:false,dueDate:"",vendor:""},
+    {id:"gi2",text:"สั่งผลิตหรือจัดซื้อของชำร่วย",done:false,dueDate:"",vendor:""},
+    {id:"gi3",text:"เตรียมของรับไหว้สำหรับพิธีแต่งงาน",done:false,dueDate:"",vendor:""},
+    {id:"gi4",text:"จัดเตรียมของที่ระลึกพิเศษสำหรับ VIP",done:false,dueDate:"",vendor:""},
+    {id:"gi5",text:"ห่อและติดป้ายของชำร่วยทั้งหมด",done:false,dueDate:"",vendor:""},
+    {id:"gi6",text:"วางแผนการแจกของที่งาน",done:false,dueDate:"",vendor:""},
+  ]},
+  {id:"legal",icon:"📄",title:"เอกสารและฮันนีมูน",color:"#9DB4C0",items:[
+    {id:"l1",text:"จดทะเบียนสมรส",done:false,dueDate:"",vendor:""},
+    {id:"l2",text:"เตรียมเอกสารทะเบียนบ้าน",done:false,dueDate:"",vendor:""},
+    {id:"l3",text:"วางแผนฮันนีมูน",done:false,dueDate:"",vendor:""},
+    {id:"l4",text:"จองที่พักฮันนีมูน",done:false,dueDate:"",vendor:""},
+    {id:"l5",text:"จองตั๋วเครื่องบิน",done:false,dueDate:"",vendor:""},
+  ]},
+];
+
+function genId(){return Math.random().toString(36).substr(2,8).toUpperCase();}
+function fmtDate(iso){if(!iso)return"";const d=new Date(iso);return d.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric"});}
+function daysDiff(iso){if(!iso)return null;const n=new Date();n.setHours(0,0,0,0);const d=new Date(iso);d.setHours(0,0,0,0);return Math.round((d-n)/86400000);}
+function dueBadge(diff){if(diff===null)return null;if(diff<0)return{t:`เลยกำหนด ${Math.abs(diff)} วัน`,c:"#e05252"};if(diff===0)return{t:"ครบกำหนดวันนี้!",c:"#e07a52"};if(diff<=7)return{t:`อีก ${diff} วัน`,c:"#d4a62a"};return{t:`อีก ${diff} วัน`,c:"#7B9E87"};}
+function gcalUrl(title,dateIso){
+  if(!dateIso)return null;
+  const d=new Date(dateIso);
+  const pad=n=>String(n).padStart(2,"0");
+  const ymd=`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  const start=ymd+"T090000";const end=ymd+"T100000";
+  const t=encodeURIComponent(title);
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${t}&dates=${start}/${end}&details=Wang+Walaya+Wedding+Planner`;
+}
+function countdown(ds){if(!ds)return null;const n=new Date();n.setHours(0,0,0,0);const w=new Date(ds);w.setHours(0,0,0,0);const d=Math.round((w-n)/86400000);if(d<0)return`งานผ่านไปแล้ว ${Math.abs(d)} วัน 🎉`;if(d===0)return"วันนี้คือวันแต่งงาน! 💍";return`อีก ${d} วัน`;}
+
+// ── SCREENS ──────────────────────────────────────────────────────────────
+function Spinner(){return <div style={{textAlign:"center",padding:60}}><div className="spinner"/><p style={{color:"#9a8070",marginTop:16,fontSize:14}}>กำลังโหลด...</p></div>;}
+
+function App(){
+  const[screen,setScreen]=useState("home"); // home | create | join | main | dashboard
+  const[allWeddings,setAllWeddings]=useState([]);
+  const[dashPin,setDashPin]=useState("");
+  const[dashErr,setDashErr]=useState("");
+  const[dashAuth,setDashAuth]=useState(false);
+  const[weddingId,setWeddingId]=useState("");
+  const[joinId,setJoinId]=useState("");
+  const[joinPin,setJoinPin]=useState("");
+  const[joinErr,setJoinErr]=useState("");
+  const[role,setRole]=useState(null);
+  const[wData,setWData]=useState(null);
+  const[syncing,setSyncing]=useState(false);
+  const[online,setOnline]=useState(true);
+
+  // Listen for firebase config missing
+  const[configOk]=useState(()=>window.FIREBASE_CONFIG?.apiKey!=="PASTE_YOUR_apiKey_HERE" && typeof firebase!=="undefined");
+
+  useEffect(()=>{
+    const off1=()=>setOnline(false); const on1=()=>setOnline(true);
+    window.addEventListener("offline",off1); window.addEventListener("online",on1);
+    return()=>{window.removeEventListener("offline",off1);window.removeEventListener("online",on1);};
+  },[]);
+
+  // Realtime listener
+  useEffect(()=>{
+    if(!weddingId||screen!=="main")return;
+    const ref=db.ref("weddings/"+weddingId);
+    const handler=ref.on("value",snap=>{
+      const val=snap.val();
+      if(val) setWData(val);
+    });
+    return()=>ref.off("value",handler);
+  },[weddingId,screen]);
+
+  function writeDb(path,value){
+    setSyncing(true);
+    db.ref("weddings/"+weddingId+"/"+path).set(value)
+      .finally(()=>setTimeout(()=>setSyncing(false),600));
+  }
+
+  async function loadAllWeddings(){
+    try{
+      const snap=await db.ref("weddings").get();
+      const data=snap.val();
+      if(!data){setAllWeddings([]);return;}
+      const list=Object.values(data).filter(v=>v&&typeof v==="object").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      setAllWeddings(list);
+    }catch(e){
+      // fallback: try once()
+      db.ref("weddings").once("value").then(snap=>{
+        const data=snap.val();
+        if(!data){setAllWeddings([]);return;}
+        const list=Object.values(data).filter(v=>v&&typeof v==="object").sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+        setAllWeddings(list);
+      }).catch(()=>setAllWeddings([]));
+    }
+  }
+
+  async function createWedding(coupleName,wedDate,plannerPin,guestPin){
+    const id=genId();
+    const data={
+      id, coupleName, weddingDate:wedDate,
+      plannerPin, guestPin,
+      categories:DEFAULT_CATEGORIES,
+      createdAt:Date.now()
+    };
+    await db.ref("weddings/"+id).set(data);
+    setWeddingId(id); setWData(data); setRole("planner"); setScreen("main");
+    return id;
+  }
+
+  async function joinWedding(){
+    setJoinErr("");
+    try{
+      const snap=await db.ref("weddings/"+joinId.trim().toUpperCase()).get();
+      if(!snap.exists())return setJoinErr("ไม่พบ Wedding ID นี้");
+      const data=snap.val();
+      if(joinPin===data.plannerPin){setRole("planner");}
+      else if(joinPin===data.guestPin){setRole("guest");}
+      else return setJoinErr("PIN ไม่ถูกต้อง");
+      setWeddingId(joinId.trim().toUpperCase()); setWData(data); setScreen("main");
+    }catch(e){setJoinErr("เกิดข้อผิดพลาด กรุณาลองใหม่");}
+  }
+
+  if(!configOk) return <ConfigWarning/>;
+  if(screen==="dashboard") return <DashboardScreen weddings={allWeddings} onLoad={loadAllWeddings} onBack={()=>{setScreen("home");setDashAuth(false);setDashPin("");}} onOpen={(w)=>{setWeddingId(w.id);setWData(w);setRole("planner");setScreen("main");}} dashPin={dashPin} setDashPin={setDashPin} dashErr={dashErr} setDashErr={setDashErr} dashAuth={dashAuth} setDashAuth={setDashAuth}/>;
+  if(screen==="home") return <HomeScreen onCreate={()=>setScreen("create")} onJoin={()=>setScreen("join")} onDash={()=>setScreen("dashboard")}/>;
+  if(screen==="create") return <CreateScreen onCreate={createWedding} onBack={()=>setScreen("home")}/>;
+  if(screen==="join") return <JoinScreen joinId={joinId} setJoinId={setJoinId} joinPin={joinPin} setJoinPin={setJoinPin} joinErr={joinErr} onJoin={joinWedding} onBack={()=>setScreen("home")}/>;
+  if(screen==="main"&&wData) return <MainApp wData={wData} role={role} weddingId={weddingId} writeDb={writeDb} syncing={syncing} online={online} onExit={()=>{setScreen("home");setRole(null);setWData(null);setWeddingId("");}}/>;
+  return <Spinner/>;
+}
+
+function ConfigWarning(){
+  return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{maxWidth:380,background:"#fff",borderRadius:20,padding:28,boxShadow:"0 4px 20px rgba(74,55,40,.1)"}}>
+        <p style={{fontSize:32,textAlign:"center",marginBottom:12}}>⚙️</p>
+        <h2 style={{fontSize:18,color:"#4a3728",fontWeight:700,marginBottom:12,textAlign:"center"}}>ต้องตั้งค่า Firebase ก่อน</h2>
+        <p style={{fontSize:14,color:"#7a6555",lineHeight:1.7,marginBottom:16}}>
+          กรุณาเปิดไฟล์ HTML ด้วย Text Editor แล้วแทนที่ค่า <code style={{background:"#f0e8df",padding:"1px 6px",borderRadius:4,fontSize:12}}>PASTE_YOUR_..._HERE</code> ด้วยข้อมูลจาก Firebase Console
+        </p>
+        <div style={{background:"#fdf8f3",borderRadius:10,padding:14,fontSize:12,color:"#6b4c38",lineHeight:2}}>
+          <b>วิธีทำ:</b><br/>
+          1. ไปที่ <b>console.firebase.google.com</b><br/>
+          2. สร้าง Project ใหม่<br/>
+          3. เพิ่ม Web App → คัดลอก Config<br/>
+          4. เปิด Realtime Database → สร้าง DB<br/>
+          5. ตั้ง Rules เป็น <code style={{background:"#f0e8df",padding:"1px 4px",borderRadius:3}}>true</code><br/>
+          6. วาง Config ลงในไฟล์ HTML<br/>
+          7. อัปโหลดขึ้น Netlify ใหม่
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeScreen({onCreate,onJoin,onDash}){
+  return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#4a3728 0%,#7a5c44 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:24,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:-100,right:-100,width:300,height:300,borderRadius:"50%",background:"rgba(201,169,110,.15)"}}/>
+      <div style={{position:"absolute",bottom:-80,left:-80,width:250,height:250,borderRadius:"50%",background:"rgba(181,131,141,.12)"}}/>
+      <div style={{width:"100%",maxWidth:340,position:"relative",zIndex:1,textAlign:"center"}}>
+        <p style={{fontSize:52,marginBottom:8}}>💍</p>
+        <p style={{color:"#C9A96E",fontSize:11,letterSpacing:4,marginBottom:6}}>✦ WANG WALAYA ✦</p>
+        <h1 style={{color:"#fff",fontSize:28,fontWeight:300,letterSpacing:3,fontStyle:"italic",marginBottom:4}}>Wedding Planner</h1>
+        <p style={{color:"rgba(255,255,255,.5)",fontSize:12,marginBottom:8}}>📞 095-425-2999</p>
+        <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:36}}>ระบบจัดการงานแต่งงาน · Realtime Sync</p>
+        <button onClick={onCreate} style={{width:"100%",padding:"14px",border:"none",borderRadius:99,background:"linear-gradient(135deg,#C9A96E,#e8c98a)",color:"#4a3728",fontSize:16,cursor:"pointer",fontWeight:700,marginBottom:12,letterSpacing:.5}}>
+          ✨ สร้างงานแต่งงานใหม่
+        </button>
+        <button onClick={onJoin} style={{width:"100%",padding:"14px",border:"2px solid rgba(255,255,255,.3)",borderRadius:99,background:"transparent",color:"#fff",fontSize:15,cursor:"pointer",fontWeight:600}}>
+          🔑 เข้าร่วมงานที่มีอยู่
+        </button>
+        <button onClick={onDash} style={{width:"100%",padding:"12px",border:"none",borderRadius:99,background:"rgba(201,169,110,.2)",color:"#C9A96E",fontSize:14,cursor:"pointer",fontWeight:600,marginTop:10}}>
+          👑 Dashboard Planner
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CreateScreen({onCreate,onBack}){
+  const[name,setName]=useState("");
+  const[date,setDate]=useState("");
+  const[pPin,setPPin]=useState("");
+  const[pPin2,setPPin2]=useState("");
+  const[gPin,setGPin]=useState("");
+  const[err,setErr]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[createdId,setCreatedId]=useState(null);
+
+  async function handleCreate(){
+    if(!name.trim())return setErr("กรุณาใส่ชื่อคู่บ่าวสาว");
+    if(pPin.length<4)return setErr("PIN Planner ต้องมีอย่างน้อย 4 ตัว");
+    if(pPin!==pPin2)return setErr("PIN Planner ไม่ตรงกัน");
+    if(gPin.length<4)return setErr("PIN บ่าวสาว/แขกต้องมีอย่างน้อย 4 ตัว");
+    if(pPin===gPin)return setErr("PIN Planner และ PIN แขกต้องต่างกัน");
+    setLoading(true);
+    try{
+      const id=await onCreate(name.trim(),date,pPin,gPin);
+      setCreatedId(id);
+    }catch(e){setErr("เกิดข้อผิดพลาด: "+e.message);}
+    setLoading(false);
+  }
+
+  if(createdId) return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{maxWidth:340,width:"100%",textAlign:"center"}}>
+        <p style={{fontSize:48,marginBottom:12}}>🎉</p>
+        <h2 style={{fontSize:20,color:"#4a3728",fontWeight:700,marginBottom:8}}>สร้างงานสำเร็จ!</h2>
+        <div style={{background:"#4a3728",borderRadius:16,padding:20,marginBottom:16}}>
+          <p style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:6}}>Wedding ID (แชร์ให้บ่าวสาว)</p>
+          <p style={{color:"#C9A96E",fontSize:32,fontWeight:700,letterSpacing:6}}>{createdId}</p>
+        </div>
+        <div style={{background:"#fff",borderRadius:12,padding:14,marginBottom:16,border:"1px solid #f0e8df",textAlign:"left"}}>
+          <p style={{fontSize:12,color:"#9a8070",marginBottom:4}}>📋 วิธีแชร์ให้บ่าวสาว</p>
+          <p style={{fontSize:13,color:"#4a3728",lineHeight:1.8}}>
+            1. ส่งลิงก์เว็บ + Wedding ID: <b>{createdId}</b><br/>
+            2. ส่ง PIN บ่าวสาว/แขก ที่ตั้งไว้<br/>
+            3. บ่าวสาวกด "เข้าร่วมงาน" แล้วใส่ทั้งสองอย่าง
+          </p>
+        </div>
+        <p style={{fontSize:13,color:"#9a8070",marginBottom:16}}>กำลังเข้าสู่ระบบอัตโนมัติ...</p>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{width:"100%",maxWidth:340}}>
+        <button onClick={onBack} style={S.backBtn}>← กลับ</button>
+        <p style={{fontSize:40,textAlign:"center",marginBottom:8}}>💍</p>
+        <h2 style={{fontSize:20,color:"#4a3728",fontWeight:700,textAlign:"center",marginBottom:4}}>สร้างงานแต่งงานใหม่</h2>
+        <p style={{fontSize:13,color:"#9a8070",textAlign:"center",marginBottom:20}}>ข้อมูลจะ sync realtime ทุก device</p>
+        {[
+          ["ชื่อคู่บ่าวสาว เช่น น้ำ & นนท์",name,setName,"text"],
+          ["วันแต่งงาน",date,setDate,"date"],
+          ["PIN สำหรับ Planner (4+ ตัว)",pPin,setPPin,"password"],
+          ["ยืนยัน PIN Planner",pPin2,setPPin2,"password"],
+          ["PIN สำหรับบ่าวสาว/แขก (4+ ตัว)",gPin,setGPin,"password"],
+        ].map(([ph,v,sv,tp],i)=>(
+          <input key={i} type={tp} placeholder={ph} value={v} onChange={e=>sv(e.target.value)} style={S.input}/>
+        ))}
+        {err&&<p style={S.err}>{err}</p>}
+        <button onClick={handleCreate} disabled={loading} style={{...S.btnPrimary,opacity:loading?.6:1}}>
+          {loading?"กำลังสร้าง...":"สร้างงานแต่งงาน ✨"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function JoinScreen({joinId,setJoinId,joinPin,setJoinPin,joinErr,onJoin,onBack}){
+  return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{width:"100%",maxWidth:340}}>
+        <button onClick={onBack} style={S.backBtn}>← กลับ</button>
+        <p style={{fontSize:40,textAlign:"center",marginBottom:8}}>🔑</p>
+        <h2 style={{fontSize:20,color:"#4a3728",fontWeight:700,textAlign:"center",marginBottom:4}}>เข้าร่วมงานแต่งงาน</h2>
+        <p style={{fontSize:13,color:"#9a8070",textAlign:"center",marginBottom:20}}>ใส่ Wedding ID และ PIN ที่ได้รับ</p>
+        <input placeholder="Wedding ID (8 ตัว เช่น AB12CD34)" value={joinId}
+          onChange={e=>setJoinId(e.target.value.toUpperCase())}
+          style={{...S.input,textAlign:"center",letterSpacing:4,fontSize:18,fontWeight:700}}/>
+        <input type="password" placeholder="PIN" value={joinPin}
+          onChange={e=>setJoinPin(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&onJoin()}
+          style={{...S.input,textAlign:"center",letterSpacing:6,fontSize:18}}/>
+        {joinErr&&<p style={S.err}>{joinErr}</p>}
+        <button onClick={onJoin} style={S.btnPrimary}>เข้าสู่ระบบ 🌸</button>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────
+function MainApp({wData,role,weddingId,writeDb,syncing,online,onExit}){
+  const isP=role==="planner";
+  const cats=wData.categories||[];
+  const[tab,setTab]=useState("all");
+  const[addTo,setAddTo]=useState(null);
+  const[newTxt,setNewTxt]=useState("");const[newDue,setNewDue]=useState("");
+  const[editItem,setEditItem]=useState(null);const[eTxt,setETxt]=useState("");const[eDue,setEDue]=useState("");const[eVendor,setEVendor]=useState("");
+  const[editCat,setEditCat]=useState(null);const[eCatT,setECatT]=useState("");
+  const[showSet,setShowSet]=useState(false);
+  const[sWDate,setSWDate]=useState(wData.weddingDate||"");
+  const[sCouple,setSCouple]=useState(wData.coupleName||"");
+  const[sGP,setSGP]=useState("");
+  const impRef=useRef();
+
+  const total=cats.reduce((a,c)=>a+c.items.length,0);
+  const done=cats.reduce((a,c)=>a+c.items.filter(i=>i.done).length,0);
+  const pct=total>0?Math.round(done/total*100):0;
+
+  function updCats(newCats){writeDb("categories",newCats);}
+  function toggleItem(cid,iid){
+    const nc=cats.map(c=>c.id!==cid?c:{...c,items:c.items.map(i=>i.id!==iid?i:{...i,done:!i.done})});
+    updCats(nc);
+  }
+  function addItem(cid){
+    if(!newTxt.trim())return;
+    const nc=cats.map(c=>c.id!==cid?c:{...c,items:[...c.items,{id:`${cid}-${Date.now()}`,text:newTxt.trim(),done:false,dueDate:newDue,vendor:""}]});
+    updCats(nc);setNewTxt("");setNewDue("");setAddTo(null);
+  }
+  function delItem(cid,iid){updCats(cats.map(c=>c.id!==cid?c:{...c,items:c.items.filter(i=>i.id!==iid)}));}
+  function saveEI(cid,iid){
+    if(isP){
+      updCats(cats.map(c=>c.id!==cid?c:{...c,items:c.items.map(i=>i.id!==iid?i:{...i,text:eTxt,dueDate:eDue,vendor:eVendor})}));
+    } else {
+      updCats(cats.map(c=>c.id!==cid?c:{...c,items:c.items.map(i=>i.id!==iid?i:{...i,vendor:eVendor})}));
+    }
+    setEditItem(null);
+  }
+  function saveCT(cid){updCats(cats.map(c=>c.id!==cid?c:{...c,title:eCatT}));setEditCat(null);}
+  function addCat(){
+    const id="cat-"+Date.now();
+    const cols=["#C9A96E","#B5838D","#9DB4C0","#A8C5A0","#ADA7C9","#DDB892"];
+    const nc={id,icon:"📌",title:"หมวดหมู่ใหม่",color:cols[cats.length%cols.length],items:[]};
+    updCats([...cats,nc]);setTab("all");
+  }
+  function delCat(cid){if(!window.confirm("ลบหมวดหมู่นี้?"))return;updCats(cats.filter(c=>c.id!==cid));}
+
+  const vis=tab==="all"?cats:tab==="pending"?cats.map(c=>({...c,items:c.items.filter(i=>!i.done)})).filter(c=>c.items.length>0):cats.map(c=>({...c,items:c.items.filter(i=>i.done)})).filter(c=>c.items.length>0);
+  const inp={padding:"8px 10px",border:"1.5px solid #e0d4c8",borderRadius:8,fontSize:13,outline:"none",color:"#4a3728",background:"#fdf8f3",width:"100%",boxSizing:"border-box"};
+  const smB={padding:"8px",border:"none",borderRadius:8,background:"#4a3728",color:"#fff",fontSize:13,cursor:"pointer",fontWeight:600};
+  const smG={padding:"8px",border:"1.5px solid #e0d4c8",borderRadius:8,background:"transparent",color:"#9a8070",fontSize:13,cursor:"pointer"};
+
+  return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",paddingBottom:48}}>
+      {/* STATUS BAR */}
+      <div style={{background:online?"#4a3728":"#c0392b",padding:"4px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{color:"rgba(255,255,255,.7)",fontSize:11}}>
+          {online?(syncing?"⏳ กำลัง sync...":"🟢 Realtime sync"):"🔴 ออฟไลน์"}
+        </span>
+        <span style={{color:"#C9A96E",fontSize:11,fontWeight:600,letterSpacing:1}}>ID: {weddingId}</span>
+      </div>
+
+      {/* HEADER */}
+      <header style={{background:"linear-gradient(135deg,#4a3728 0%,#6b4c38 100%)",padding:"20px 20px 18px"}}>
+        <div style={{maxWidth:480,margin:"0 auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+            <div>
+              <p style={{color:"#C9A96E",fontSize:10,letterSpacing:3,margin:"0 0 3px"}}>✦ WANG WALAYA WEDDING PLANNER ✦</p>
+              <h1 style={{color:"#fff",fontSize:22,fontWeight:300,letterSpacing:2,margin:0,fontStyle:"italic"}}>{wData.coupleName||"งานแต่งงาน"}</h1>
+              <p style={{color:"rgba(255,255,255,.4)",fontSize:11,margin:"2px 0 0"}}>📞 095-425-2999</p>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              {isP&&<button onClick={()=>setShowSet(true)} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:8,padding:"6px 9px",fontSize:15,cursor:"pointer",color:"#fff"}}>⚙️</button>}
+              <button onClick={onExit} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:8,padding:"6px 9px",fontSize:15,cursor:"pointer",color:"#fff"}}>🚪</button>
+            </div>
+          </div>
+          {wData.weddingDate&&(
+            <div style={{background:"rgba(255,255,255,.1)",borderRadius:8,padding:"8px 12px",marginBottom:10,display:"flex",justifyContent:"space-between"}}>
+              <span style={{color:"rgba(255,255,255,.65)",fontSize:12}}>📅 {fmtDate(wData.weddingDate)}</span>
+              <span style={{color:"#C9A96E",fontSize:13,fontWeight:700}}>{countdown(wData.weddingDate)}</span>
+            </div>
+          )}
+          <div style={{background:"rgba(255,255,255,.1)",borderRadius:10,padding:"10px 12px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{color:"rgba(255,255,255,.7)",fontSize:12}}>ความคืบหน้า</span>
+              <span style={{color:"#C9A96E",fontSize:12,fontWeight:700}}>{pct}%</span>
+            </div>
+            <div style={{height:5,background:"rgba(255,255,255,.15)",borderRadius:99,overflow:"hidden",marginBottom:5}}>
+              <div style={{height:"100%",background:"linear-gradient(90deg,#C9A96E,#e8c98a)",width:`${pct}%`,borderRadius:99,transition:"width .5s"}}/>
+            </div>
+            <p style={{color:"rgba(255,255,255,.45)",fontSize:11,margin:0,textAlign:"right"}}>{done}/{total} รายการ · {isP?"👑 Planner":"💑 บ่าวสาว/แขก"}</p>
+          </div>
+        </div>
+      </header>
+
+      {/* TABS */}
+      <div style={{display:"flex",padding:"10px 16px",gap:8,maxWidth:480,margin:"0 auto"}}>
+        {[{id:"all",l:"ทั้งหมด"},{id:"pending",l:"ยังไม่เสร็จ"},{id:"done",l:"เสร็จแล้ว"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,padding:"7px 0",border:"1.5px solid"+(tab===t.id?" #4a3728":" #e8ddd4"),borderRadius:99,background:tab===t.id?"#4a3728":"transparent",color:tab===t.id?"#fff":"#9a8070",fontSize:13,cursor:"pointer",fontWeight:tab===t.id?600:400}}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {isP&&(
+        <div style={{display:"flex",gap:8,padding:"0 16px 10px",maxWidth:480,margin:"0 auto",flexWrap:"wrap"}}>
+          {[["➕ เพิ่มหมวด",addCat]].map(([l,fn],i)=>(
+            <button key={i} onClick={fn} style={{padding:"6px 14px",border:"1.5px solid #e0d4c8",borderRadius:99,background:"#fff",color:"#6b4c38",fontSize:12,cursor:"pointer",fontWeight:600}}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {/* CARDS */}
+      <main style={{maxWidth:480,margin:"0 auto",padding:"0 16px",display:"flex",flexDirection:"column",gap:14}}>
+        {vis.map(cat=>{
+          const cd=cat.items.filter(i=>i.done).length;
+          return(
+            <section key={cat.id} style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(74,55,40,.07)",border:"1px solid #f0e8df"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
+                  <span style={{fontSize:18}}>{cat.icon}</span>
+                  {isP&&editCat===cat.id?(
+                    <div style={{display:"flex",gap:6,flex:1}}>
+                      <input value={eCatT} onChange={e=>setECatT(e.target.value)} style={{...inp,flex:1}}/>
+                      <button onClick={()=>saveCT(cat.id)} style={smB}>✓</button>
+                      <button onClick={()=>setEditCat(null)} style={smG}>✕</button>
+                    </div>
+                  ):(
+                    <h2 style={{fontSize:15,fontWeight:600,color:"#3a2b1f",margin:0,cursor:isP?"pointer":"default"}}
+                      onClick={()=>{if(isP){setEditCat(cat.id);setECatT(cat.title);}}}>
+                      {cat.title}{isP&&<span style={{fontSize:10,opacity:.35}}> ✏️</span>}
+                    </h2>
+                  )}
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{fontSize:12,fontWeight:600,padding:"3px 9px",borderRadius:99,
+                    background:cd===cat.items.length&&cat.items.length>0?"#A8C5A0":"#f0e8df",
+                    color:cd===cat.items.length&&cat.items.length>0?"#fff":"#9a8070"}}>{cd}/{cat.items.length}</span>
+                  {isP&&<button onClick={()=>delCat(cat.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.4}}>🗑️</button>}
+                </div>
+              </div>
+
+              <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                {cat.items.map(item=>{
+                  const diff=daysDiff(item.dueDate);
+                  const b=item.done?null:dueBadge(diff);
+                  const isEI=editItem?.cid===cat.id&&editItem?.iid===item.id;
+                  return(
+                    <div key={item.id} style={{borderRadius:10,background:item.done?"#faf7f4":"#fff"}}>
+                      {isEI?(
+                        <div style={{padding:10,display:"flex",flexDirection:"column",gap:7,background:"#fdf8f3",borderRadius:10}}>
+                          {isP&&<input value={eTxt} onChange={e=>setETxt(e.target.value)} style={inp} placeholder="ชื่อรายการ"/>}
+                          {isP&&<input type="date" value={eDue} onChange={e=>setEDue(e.target.value)} style={inp}/>}
+                          <input placeholder="👤 ชื่อ-เบอร์ผู้ให้บริการ เช่น คุณสมชาย 081-234-5678" value={eVendor} onChange={e=>setEVendor(e.target.value)} style={inp}/>
+                          <div style={{display:"flex",gap:6}}>
+                            <button onClick={()=>saveEI(cat.id,item.id)} style={{...smB,flex:1}}>บันทึก</button>
+                            <button onClick={()=>setEditItem(null)} style={{...smG,flex:1}}>ยกเลิก</button>
+                          </div>
+                        </div>
+                      ):(
+                        <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"9px 10px"}}>
+                          <button onClick={()=>toggleItem(cat.id,item.id)} style={{background:"none",border:"none",cursor:"pointer",padding:0,paddingTop:2,flexShrink:0}}>
+                            <span style={{width:21,height:21,borderRadius:6,border:"2px solid",borderColor:item.done?cat.color:"#d4c5b5",background:item.done?cat.color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
+                              {item.done&&<svg width="11" height="11" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"/></svg>}
+                            </span>
+                          </button>
+                          <div style={{flex:1,minWidth:0}}>
+                            <span style={{fontSize:14,lineHeight:1.4,display:"block",wordBreak:"break-word",color:item.done?"#b8a898":"#3a2b1f",textDecoration:item.done?"line-through":"none"}}>{item.text}</span>
+                            {item.vendor&&<span style={{fontSize:12,display:"flex",alignItems:"center",gap:4,marginTop:3,color:"#7B9E87",fontWeight:600}}>👤 {item.vendor}</span>}
+                            {item.dueDate&&<span style={{fontSize:11,display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
+                                              <span style={{color:b?.c||"#bbb"}}>📅 {fmtDate(item.dueDate)}{b?` · ${b.t}`:""}</span>
+                                              <a href={gcalUrl(item.text,item.dueDate)} target="_blank" rel="noopener noreferrer"
+                                                style={{color:"#4285F4",fontSize:10,textDecoration:"none",background:"#e8f0fe",padding:"1px 7px",borderRadius:99,fontWeight:600,whiteSpace:"nowrap"}}>
+                                                + Google Calendar
+                                              </a>
+                                            </span>}
+                          </div>
+                          <div style={{display:"flex",gap:2,flexShrink:0}}>
+                            <button onClick={()=>{setEditItem({cid:cat.id,iid:item.id});setETxt(item.text);setEDue(item.dueDate||"");setEVendor(item.vendor||"");}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.5}} title="กรอกชื่อผู้ให้บริการ">✏️</button>
+                            {isP&&<button onClick={()=>delItem(cat.id,item.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.5}}>🗑️</button>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {isP&&(addTo===cat.id?(
+                <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:7}}>
+                  <input placeholder="ชื่อรายการใหม่..." value={newTxt} onChange={e=>setNewTxt(e.target.value)}
+                    onKeyDown={e=>e.key==="Enter"&&addItem(cat.id)} style={inp} autoFocus/>
+                  <input type="date" value={newDue} onChange={e=>setNewDue(e.target.value)} style={inp}/>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>addItem(cat.id)} style={{...smB,background:cat.color,flex:1}}>เพิ่ม</button>
+                    <button onClick={()=>{setAddTo(null);setNewTxt("");setNewDue("");}} style={{...smG,flex:1}}>ยกเลิก</button>
+                  </div>
+                </div>
+              ):(
+                <button onClick={()=>setAddTo(cat.id)} style={{marginTop:8,width:"100%",padding:7,border:"1.5px dashed #e0d4c8",borderRadius:10,background:"transparent",color:"#b8a898",fontSize:13,cursor:"pointer"}}>+ เพิ่มรายการ</button>
+              ))}
+            </section>
+          );
+        })}
+      </main>
+
+      {/* SETTINGS MODAL */}
+      {showSet&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(74,55,40,.65)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:20}}
+          onClick={e=>e.target===e.currentTarget&&setShowSet(false)}>
+          <div style={{background:"#fff",borderRadius:20,padding:"24px 20px",maxWidth:340,width:"100%"}}>
+            <h2 style={{fontSize:17,fontWeight:700,color:"#3a2b1f",marginBottom:14}}>⚙️ ตั้งค่างาน</h2>
+            <div style={{background:"#f0e8df",borderRadius:10,padding:"10px 12px",marginBottom:14}}>
+              <p style={{fontSize:11,color:"#9a8070",marginBottom:2}}>Wedding ID</p>
+              <p style={{fontSize:20,fontWeight:700,color:"#4a3728",letterSpacing:3}}>{weddingId}</p>
+            </div>
+            {[["ชื่อคู่บ่าวสาว",sCouple,setSCouple,"text"],["วันแต่งงาน",sWDate,setSWDate,"date"]].map(([lb,v,sv,tp],i)=>(
+              <div key={i} style={{marginBottom:10}}>
+                <label style={{fontSize:12,color:"#9a8070",display:"block",marginBottom:3,fontWeight:600}}>{lb}</label>
+                <input type={tp} value={v} onChange={e=>sv(e.target.value)} style={{...inp}}/>
+              </div>
+            ))}
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:12,color:"#9a8070",display:"block",marginBottom:3,fontWeight:600}}>PIN บ่าวสาว/แขก (เปลี่ยน)</label>
+              <input type="password" placeholder="ใส่ PIN ใหม่ (เว้นว่างถ้าไม่เปลี่ยน)" value={sGP} onChange={e=>setSGP(e.target.value)} style={{...inp}}/>
+            </div>
+            <button style={{...S.btnPrimary,marginBottom:8}} onClick={()=>{
+              writeDb("coupleName",sCouple);
+              writeDb("weddingDate",sWDate);
+              if(sGP.length>=4) writeDb("guestPin",sGP);
+              setShowSet(false);
+            }}>บันทึก</button>
+            <button style={S.btnGhost} onClick={()=>setShowSet(false)}>ปิด</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const S={
+  input:{padding:"11px 14px",border:"1.5px solid #e0d4c8",borderRadius:10,fontSize:14,outline:"none",color:"#4a3728",background:"#fdf8f3",width:"100%",boxSizing:"border-box",marginBottom:10},
+  err:{color:"#e05252",fontSize:13,marginBottom:10,textAlign:"center"},
+  btnPrimary:{width:"100%",padding:13,border:"none",borderRadius:99,background:"linear-gradient(135deg,#4a3728,#6b4c38)",color:"#fff",fontSize:15,cursor:"pointer",fontWeight:600,display:"block"},
+  btnGhost:{width:"100%",padding:11,border:"1.5px solid #e0d4c8",borderRadius:99,background:"transparent",color:"#9a8070",fontSize:14,cursor:"pointer",display:"block"},
+  backBtn:{background:"none",border:"none",color:"#9a8070",fontSize:14,cursor:"pointer",marginBottom:16,padding:0},
+};
+
+function DashboardScreen({weddings,onLoad,onBack,onOpen,dashPin,setDashPin,dashErr,setDashErr,dashAuth,setDashAuth}){
+  const MASTER_PIN="wangwalaya2025";
+  const[loading,setLoading]=useState(false);
+  const[dashTab,setDashTab]=useState("active"); // active | archived
+  async function doLoad(){setLoading(true);try{await onLoad();}catch(e){}finally{setLoading(false);}}
+  useEffect(()=>{if(dashAuth){doLoad();}},[dashAuth]);
+
+  function tryAuth(){
+    if(dashPin===MASTER_PIN){setDashAuth(true);setDashErr("");}
+    else setDashErr("PIN ไม่ถูกต้อง");
+  }
+  function fmtD(iso){if(!iso)return"-";const d=new Date(iso);return d.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric"});}
+  function copyText(t){navigator.clipboard?.writeText(t).catch(()=>{});}
+
+  async function archiveWedding(id){
+    await db.ref("weddings/"+id+"/archived").set(true);
+    doLoad();
+  }
+  async function unarchiveWedding(id){
+    await db.ref("weddings/"+id+"/archived").set(false);
+    doLoad();
+  }
+  async function deleteWedding(id){
+    if(!window.confirm("ลบงานนี้ถาวรหรือไม่? ไม่สามารถกู้คืนได้"))return;
+    await db.ref("weddings/"+id).remove();
+    doLoad();
+  }
+
+  const activeWeddings=weddings.filter(w=>!w.archived);
+  const archivedWeddings=weddings.filter(w=>w.archived);
+  const displayList=dashTab==="active"?activeWeddings:archivedWeddings;
+
+  if(!dashAuth) return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{width:"100%",maxWidth:320,textAlign:"center"}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:"#9a8070",fontSize:14,cursor:"pointer",marginBottom:20,display:"block"}}>← กลับ</button>
+        <p style={{fontSize:40,marginBottom:8}}>👑</p>
+        <h2 style={{fontSize:20,color:"#4a3728",fontWeight:700,marginBottom:4}}>Planner Dashboard</h2>
+        <p style={{fontSize:13,color:"#9a8070",marginBottom:20}}>ใส่ Master PIN เพื่อเข้าถึง</p>
+        <input type="password" placeholder="Master PIN" value={dashPin} onChange={e=>setDashPin(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&tryAuth()}
+          style={{width:"100%",padding:"12px 14px",border:"1.5px solid #e0d4c8",borderRadius:10,fontSize:18,textAlign:"center",letterSpacing:6,outline:"none",color:"#4a3728",background:"#fdf8f3",marginBottom:10,boxSizing:"border-box"}}/>
+        {dashErr&&<p style={{color:"#e05252",fontSize:13,marginBottom:10}}>{dashErr}</p>}
+        <button onClick={tryAuth} style={{width:"100%",padding:13,border:"none",borderRadius:99,background:"linear-gradient(135deg,#4a3728,#6b4c38)",color:"#fff",fontSize:15,cursor:"pointer",fontWeight:600}}>เข้าสู่ Dashboard</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:"#fdf8f3",paddingBottom:48}}>
+      <header style={{background:"linear-gradient(135deg,#4a3728,#6b4c38)",padding:"24px 20px 20px"}}>
+        <div style={{maxWidth:480,margin:"0 auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+            <div>
+              <p style={{color:"#C9A96E",fontSize:10,letterSpacing:3,margin:"0 0 3px"}}>✦ WANG WALAYA ✦</p>
+              <h1 style={{color:"#fff",fontSize:20,fontWeight:300,letterSpacing:2,margin:0,fontStyle:"italic"}}>Planner Dashboard</h1>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={doLoad} style={{background:"rgba(201,169,110,.3)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,cursor:"pointer",color:"#C9A96E"}}>{loading?"⏳":"🔄"}</button>
+              <button onClick={onBack} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,cursor:"pointer",color:"#fff"}}>← ออก</button>
+            </div>
+          </div>
+          <p style={{color:"rgba(255,255,255,.5)",fontSize:12,margin:"8px 0 0"}}>กำลังดำเนินการ {activeWeddings.length} งาน · จบแล้ว {archivedWeddings.length} งาน</p>
+        </div>
+      </header>
+
+      {/* TABS */}
+      <div style={{display:"flex",padding:"10px 16px",gap:8,maxWidth:480,margin:"0 auto"}}>
+        <button onClick={()=>setDashTab("active")}
+          style={{flex:1,padding:"8px",border:"1.5px solid"+(dashTab==="active"?" #4a3728":" #e8ddd4"),borderRadius:99,background:dashTab==="active"?"#4a3728":"transparent",color:dashTab==="active"?"#fff":"#9a8070",fontSize:13,cursor:"pointer",fontWeight:dashTab==="active"?600:400}}>
+          💼 กำลังดำเนินการ ({activeWeddings.length})
+        </button>
+        <button onClick={()=>setDashTab("archived")}
+          style={{flex:1,padding:"8px",border:"1.5px solid"+(dashTab==="archived"?" #4a3728":" #e8ddd4"),borderRadius:99,background:dashTab==="archived"?"#4a3728":"transparent",color:dashTab==="archived"?"#fff":"#9a8070",fontSize:13,cursor:"pointer",fontWeight:dashTab==="archived"?600:400}}>
+          📦 จบแล้ว ({archivedWeddings.length})
+        </button>
+      </div>
+
+      <main style={{maxWidth:480,margin:"0 auto",padding:"0 16px"}}>
+        {displayList.length===0&&(
+          <div style={{textAlign:"center",padding:40,color:"#9a8070"}}>
+            {loading?"⏳ กำลังโหลด...":dashTab==="active"?"ไม่มีงานที่กำลังดำเนินการ":"ไม่มีงานที่จบแล้ว"}
+            {!loading&&weddings.length===0&&<div style={{marginTop:12,fontSize:12,background:"#fff",borderRadius:10,padding:12,textAlign:"left"}}>
+              <p style={{color:"#e05252",fontWeight:600,marginBottom:6}}>⚠️ โหลดข้อมูลไม่สำเร็จ</p>
+              <p style={{color:"#9a8070",lineHeight:1.8}}>กรุณากด 🔄 อีกครั้ง<br/>หรือ reload หน้าเว็บแล้วเข้า Dashboard ใหม่</p>
+            </div>}
+          </div>
+        )}
+        {displayList.map(w=>{
+          const total=(w.categories||[]).reduce((a,c)=>a+c.items.length,0);
+          const done=(w.categories||[]).reduce((a,c)=>a+c.items.filter(i=>i.done).length,0);
+          const pct=total>0?Math.round(done/total*100):0;
+          const cd=countdown(w.weddingDate);
+          return(
+            <div key={w.id} style={{background:"#fff",borderRadius:16,padding:16,marginBottom:12,boxShadow:"0 2px 12px rgba(74,55,40,.07)",border:"1px solid"+(w.archived?"#e8ddd4":"#f0e8df"),opacity:w.archived?.85:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                    <h3 style={{fontSize:16,fontWeight:700,color:"#3a2b1f",margin:0}}>{w.coupleName||"ไม่ระบุชื่อ"}</h3>
+                    {w.archived&&<span style={{fontSize:10,background:"#f0e8df",color:"#9a8070",padding:"2px 8px",borderRadius:99,fontWeight:600}}>จบแล้ว</span>}
+                  </div>
+                  <p style={{fontSize:12,color:"#9a8070",margin:0}}>📅 {fmtD(w.weddingDate)} {cd&&<span style={{color:"#C9A96E",fontWeight:600}}>· {cd}</span>}</p>
+                </div>
+                <span style={{fontSize:13,fontWeight:700,color:pct===100?"#7B9E87":"#C9A96E",background:pct===100?"rgba(123,158,135,.1)":"rgba(201,169,110,.1)",padding:"3px 10px",borderRadius:99,flexShrink:0,marginLeft:8}}>{pct}%</span>
+              </div>
+              <div style={{height:4,background:"#f0e8df",borderRadius:99,overflow:"hidden",marginBottom:12}}>
+                <div style={{height:"100%",background:w.archived?"#c5bdb5":"linear-gradient(90deg,#C9A96E,#e8c98a)",width:`${pct}%`,borderRadius:99}}/>
+              </div>
+              <div style={{background:"#fdf8f3",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{color:"#9a8070"}}>Wedding ID</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{color:"#4a3728",fontWeight:700,letterSpacing:2}}>{w.id}</span>
+                    <button onClick={()=>copyText(w.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.6}}>📋</button>
+                  </div>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{color:"#9a8070"}}>PIN Planner</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{color:"#4a3728",fontWeight:600}}>{w.plannerPin}</span>
+                    <button onClick={()=>copyText(w.plannerPin)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.6}}>📋</button>
+                  </div>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{color:"#9a8070"}}>PIN บ่าวสาว/แขก</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{color:"#4a3728",fontWeight:600}}>{w.guestPin}</span>
+                    <button onClick={()=>copyText(w.guestPin)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,opacity:.6}}>📋</button>
+                  </div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {!w.archived&&<button onClick={()=>onOpen(w)} style={{flex:1,padding:"9px",border:"none",borderRadius:10,background:"#4a3728",color:"#fff",fontSize:13,cursor:"pointer",fontWeight:600,minWidth:100}}>เข้าจัดการงาน →</button>}
+                {!w.archived&&<button onClick={()=>copyText(`Wedding ID: ${w.id}
+PIN บ่าวสาว: ${w.guestPin}
+ลิงก์: https://chic-donut-bec3eb.netlify.app`)} style={{padding:"9px 12px",border:"1.5px solid #e0d4c8",borderRadius:10,background:"transparent",color:"#9a8070",fontSize:13,cursor:"pointer"}}>📤</button>}
+                {!w.archived
+                  ?<button onClick={()=>archiveWedding(w.id)} style={{padding:"9px 12px",border:"1.5px solid #e0d4c8",borderRadius:10,background:"transparent",color:"#9a8070",fontSize:13,cursor:"pointer"}} title="เก็บเข้า Archive">📦 จบงาน</button>
+                  :<button onClick={()=>unarchiveWedding(w.id)} style={{flex:1,padding:"9px",border:"1.5px solid #e0d4c8",borderRadius:10,background:"transparent",color:"#9a8070",fontSize:13,cursor:"pointer"}}>↩️ คืนสถานะ</button>
+                }
+                <button onClick={()=>deleteWedding(w.id)} style={{padding:"9px 12px",border:"1.5px solid #ffd0d0",borderRadius:10,background:"transparent",color:"#e05252",fontSize:13,cursor:"pointer"}} title="ลบถาวร">🗑️</button>
+              </div>
+            </div>
+          );
+        })}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
