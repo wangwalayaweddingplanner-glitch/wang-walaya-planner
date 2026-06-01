@@ -6,11 +6,9 @@
 <title>Wang Walaya Wedding Planner</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#fdf8f3;font-family:'Sarabun','Noto Sans Thai',sans-serif;min-height:100vh;}
@@ -37,7 +35,7 @@ const FIREBASE_CONFIG = {
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 </script>
-<script type="text/babel">
+<script id="app-code" type="text/plain">
 const {useState,useEffect,useRef,useCallback}=React;
 
 const DEFAULT_CATEGORIES=[
@@ -186,7 +184,7 @@ function App(){
   const[online,setOnline]=useState(true);
 
   // Listen for firebase config missing
-  const[configOk]=useState(()=>typeof firebase!=="undefined");
+  const[configOk]=useState(()=>window.FIREBASE_CONFIG?.apiKey!=="PASTE_YOUR_apiKey_HERE" && typeof firebase!=="undefined");
 
   useEffect(()=>{
     const off1=()=>setOnline(false); const on1=()=>setOnline(true);
@@ -806,6 +804,26 @@ PIN บ่าวสาว: ${w.guestPin}
 }
 
 ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+<script>
+// Load Babel then compile and execute
+window.addEventListener('load', function() {
+  var script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js';
+  script.onload = function() {
+    var code = document.getElementById('app-code').textContent;
+    var transformed = Babel.transform(code, {
+      presets: ['react', 'env']
+    }).code;
+    var execScript = document.createElement('script');
+    execScript.textContent = transformed;
+    document.body.appendChild(execScript);
+  };
+  script.onerror = function() {
+    document.getElementById('root').innerHTML = '<p style="padding:40px;color:red">โหลดไม่ได้ กรุณาใช้ Chrome หรือ Firefox</p>';
+  };
+  document.head.appendChild(script);
+});
 </script>
 </body>
 </html>
